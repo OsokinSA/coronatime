@@ -1,6 +1,7 @@
 import json
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 @st.cache(persist = True)
 def read_regions_list(path):
@@ -40,3 +41,13 @@ def read_regions_data(path):
     for col in df.columns[1:]:
         df_cum[col] = pd.Series(df[col]).cumsum()
     return df, df_cum
+
+@st.cache(persist = True)
+def get_sorted_regions(regions_data_cum):
+    latest_entry = regions_data_cum['Дата'].max()
+    cols = np.array(regions_data_cum.columns[1:])
+    epid = np.array([
+        regions_data_cum[regions_data_cum['Дата'] == latest_entry][col].iloc[0] for col in cols
+    ])
+    cols_sorted = cols[np.argsort(-1*epid)]
+    return cols_sorted
