@@ -31,9 +31,10 @@ mode = st.sidebar.selectbox(
 )
 
 date_0 = st.sidebar.date_input('Отображать ОТ', datetime.date(2020,4,1))
-date_1 = st.sidebar.date_input('Отображать ДО', datetime.date(2020,5,1))
+#date_1 = st.sidebar.date_input('Отображать ДО', datetime.date(2020,5,1))
+date_1 = st.sidebar.date_input('Отображать ДО', regions_data['Дата'].max() + np.timedelta64(7, 'D'))
 
-date_pred_0 = st.sidebar.date_input('Отрезок для прогноза ОТ', datetime.date(2020,4,2))
+date_pred_0 = st.sidebar.date_input('Отрезок для прогноза ОТ', datetime.date(2020,4,1))
 date_pr = regions_data['Дата'].max() - np.timedelta64(3, 'D')
 #date_pred_1 = st.sidebar.date_input('Отрезок для прогноза ДО', datetime.date(2020,4,10))
 date_pred_1 = st.sidebar.date_input('Отрезок для прогноза ДО', date_pr)

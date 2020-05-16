@@ -23,7 +23,7 @@ def add_data_to_csv (df1, path, path_output):
         lambda x: pd.to_datetime(x).date()
     )
     df_parsed = df_parsed.drop('Unnamed: 0', axis=1)
-    df_parsed['Россия'] = df_parsed[[x for x in df_parsed.columns if x!= 'Дата']].sum(axis=0)
+    #df_parsed['Россия'] = df_parsed[[x for x in df_parsed.columns if x!= 'Дата']].sum(axis=0)
     
     dates = df1['Дата'].values
     

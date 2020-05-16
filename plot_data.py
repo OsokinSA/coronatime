@@ -42,11 +42,11 @@ def plot_line(data, data_delta, cols, regions_population, scale, dates, mode, ti
     if '_delta' in mode:
         df = data_delta[(data_delta['Дата'] >= dates[0]) & (data_delta['Дата'] <= dates[1])]
         df_pr = data_delta[(data_delta['Дата'] >= dates[2]) & (data_delta['Дата'] <= dates[3])]
-        values_prediction, popt_list, r2 = get_prediction_exp(data, data_delta, regions_population, dates, cols, mode)
+        values_prediction, popt_list, r2 = get_prediction(data, data_delta, regions_population, dates, cols, mode)
     else:
         df = data[(data['Дата'] >= dates[0]) & (data['Дата'] <= dates[1])]
         df_pr = data[(data['Дата'] >= dates[2]) & (data['Дата'] <= dates[3])]
-        values_prediction, popt_list, r2 = get_prediction_exp(data, data_delta, regions_population, dates, cols, mode)
+        values_prediction, popt_list, r2 = get_prediction(data, data_delta, regions_population, dates, cols, mode)
         
     if not scale:
 #        st.line_chart(
@@ -67,7 +67,7 @@ def plot_line(data, data_delta, cols, regions_population, scale, dates, mode, ti
                 st.warning('для региона "' + col + '" не удалось построить прогноз')
     plt.grid(which ='both')
     plt.xticks(rotation='vertical')
-    plt.legend(loc='upper left')
+    plt.legend(loc='lower right')
     plt.title(title)
     st.pyplot()
     return 0
@@ -77,16 +77,16 @@ def exp_func(x, b, c):
 def exp_func_delta(x, b, c):
 #   return c*np.exp(c*(x-b))
     return np.exp(c*(x-b)) - np.exp(c*(x-1-b))
-def epid_func(x, g, b, N, I0):
-    Ii = (1-g/b)*N*1000000
+def epid_func(x, g, b, c, N, I0):
+    Ii = (1-c*g/b)*N*1000000
     V = Ii/(I0*1000000) - 1
     xi = b - g
     return Ii/(1+V*np.exp(-xi*x))
-def epid_func_delta(x, g, b, N, I0):
-    Ii = (1-g/b)*N*1000000
+def epid_func_delta(x, g, b, c, N, I0):
+    Ii = (1-c*g/b)*N*1000000
     V = Ii/(I0*1000000) - 1
     xi = b - g
-    return epid_func(x, g, b, N, I0) - epid_func(x-1, g, b, N, I0)
+    return epid_func(x, g, b, c, N, I0) - epid_func(x-1, g, b, c, N, I0)
 #def polinom_2_finc(x, a, b, c):
 #    return a(x**2) + b*(x) + c
 def polynom_3_func(x, a, b, c, d):
@@ -101,11 +101,11 @@ def fit_exp(x,y):
 def fit_exp_delta(x,y):
     popt, pcov = curve_fit(exp_func_delta, x, y, p0 = [0, 0.2], bounds=((-100, -100), (100, 10)))
     return popt, pcov
-def fit_epid(x,y, popul):
-    popt, pcov = curve_fit(lambda x,g,b: epid_func(x,g,b,popul, y[0]/1000000), x, y, p0 = [0.01, 0.10], bounds=((0.001, 0.01), (0.8, 0.9)), method='trf')
+def fit_epid(x,y, popul, y0):
+    popt, pcov = curve_fit(lambda x,g,b,c: np.log(epid_func(x,g,b,c,popul, y0)), x, np.log(y), p0 = [0.24, 0.35, 1.18], bounds=((0.1, 0.2, 1.1), (0.4, 0.5, 1.36)), method='trf')
     return popt, pcov
-def fit_epid_delta(x,y, popul):
-    popt, pcov = curve_fit(lambda x,g,b: epid_func_delta(x,g,b,popul, y[0]/1000000), x, y, p0 = [0.01, 0.10], bounds=((0.001, 0.01), (0.8, 0.9)), method='trf')
+def fit_epid_delta(x,y, popul, y0):
+    popt, pcov = curve_fit(lambda x,g,b,c: np.log(epid_func_delta(x,g,b,c,popul, y0)), x, np.log(y), p0 = [0.24, 0.35, 1.18], bounds=((0.1, 0.2, 1.1), (0.4, 0.5, 1.36)), method='trf')
     return popt, pcov
 def fit_3_poly(x,y):
     p = np.polyfit(x, y, 3)
@@ -116,11 +116,11 @@ def fit_3_poly(x,y):
 
 
 def dates_to_diffs(dates_0, dates_1):
-    x_min = dates_0.min()
+    x_min = dates_1.min()
     return np.array([(val - x_min).astype('timedelta64[D]').astype('int') for val in dates_0]), np.array([(val - x_min).astype('timedelta64[D]').astype('int') for val in dates_1])
 
 
-def get_prediction_exp(df, df_delta, regions_population, dates, cols, mode):
+def get_prediction(df, df_delta, regions_population, dates, cols, mode):
     delta = (dates[1] - dates[0]).astype('timedelta64[D]')
     date_pr = []
     for i in range(delta.astype('int') + 1):
@@ -145,14 +145,14 @@ def get_prediction_exp(df, df_delta, regions_population, dates, cols, mode):
             y_fit = exp_func_delta(x_fit, popt[0], popt[1])
         elif mode == 'epid':
             popul = regions_population[regions_population['region'] == col]['population'].iloc[0]/1000000
-            popt, pcov = fit_epid(x_fit, y_data, popul)
-            y_predict = epid_func(x_predict, popt[0], popt[1], popul, y_data[0]/1000000)            
-            y_fit = epid_func(x_fit, popt[0], popt[1], popul, y_data[0]/1000000)            
+            popt, pcov = fit_epid(x_fit, y_data, popul, y_data[0]/1000000)
+            y_predict = epid_func(x_predict, popt[0], popt[1], popt[2], popul, y_data[0]/1000000)
+            y_fit = epid_func(x_fit, popt[0], popt[1], popt[2], popul, y_data[0]/1000000)
         elif mode == 'epid_delta':
             popul = regions_population[regions_population['region'] == col]['population'].iloc[0]/1000000
-            popt, pcov = fit_epid(x_fit, y_data, popul)
-            y_predict = epid_func_delta(x_predict, popt[0], popt[1], popul, y_data[0]/1000000)
-            y_fit = epid_func_delta(x_fit, popt[0], popt[1], popul, y_data[0]/1000000)
+            popt, pcov = fit_epid(x_fit, y_data, popul, y_data[0]/1000000)
+            y_predict = epid_func_delta(x_predict, popt[0], popt[1], popt[2], popul, y_data[0]/1000000)
+            y_fit = epid_func_delta(x_fit, popt[0], popt[1], popt[2], popul, y_data[0]/1000000)
         elif mode == 'polynom_3':
             popt = fit_3_poly(x_fit, y_data)
             y_predict = polynom_3_func(x_predict, popt[0], popt[1], popt[2], popt[3])
@@ -169,10 +169,10 @@ def get_prediction_exp(df, df_delta, regions_population, dates, cols, mode):
 def add_explanation(mode):
     if mode == 'exp':
         st.markdown('Приближение по формуле: $I(t) = e^{k(t-d)}$')
-        st.markdown('Не годится для долгосрочного прогноза')
+        st.markdown('Не годится для долгосрочного прогноза. Хорошо работает на краткострочных данных при экспоненциальном росте числа заболеваний.')
     elif mode == 'epid':        
         st.markdown('Приближение по формуле: $I(t) = \dfrac{I_{\infty}}{1+ (I_{\infty}/I_{0} - 1) e^{-(\gamma-b)t}}$')
-        st.markdown('Предназначена формула для долгосрочного прогноза. Но мне совсем не нравится прогноз данных, он не похож на исторические данные, напрмер для Ухани. Я ещё попробую подогнать параметры для подбора решения.')
+        st.markdown('Предназначена формула для долгосрочного прогноза. После подбора параметров работает гораздо лучше решения из коробки, но всё ещё чувствительна к началу отрезка прогноза. Рекомендуется задавать отрезок для построения прогноза более 3-х недель с захватом временных периодов с различными темпами роста числа заболеваний.')
     elif mode == 'polynom_3':
         st.markdown('Приближение по формуле: $I(t) = at^{3}+bt^{2}+ct+d$')
-        st.markdown('Работает если данных совсем мало, но я не знаю зачем тогда вам прогноз на атаких данных. Если Вам всё равно и вы не боитесь богов, то используйте на здоровье.')
+        st.markdown('Работает если данных совсем мало, или на кусочных данных, но я не знаю зачем тогда Вам прогноз на таких данных. Если Вам всё равно и вы не боитесь богов, то используйте на здоровье.')
